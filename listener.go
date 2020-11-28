@@ -3,7 +3,6 @@ package raknet
 import (
 	"bytes"
 	"fmt"
-	"github.com/sandertv/go-raknet/internal/message"
 	"log"
 	"math"
 	"math/rand"
@@ -12,6 +11,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/sandertv/go-raknet/internal/message"
 )
 
 // ListenConfig may be used to pass additional configuration to a Listener.
@@ -19,6 +20,10 @@ type ListenConfig struct {
 	// ErrorLog is a logger that errors from packet decoding are logged to. It may be set to a logger that
 	// simply discards the messages.
 	ErrorLog *log.Logger
+
+	// HandleUnconnectedPing is called by the listener and may be used to override the pong data to be returned
+	// on an unconnectedping. It may also return nil to use the pongData as specified in the listener
+	HandleUnconnectedPing func(net.Addr) []byte
 }
 
 // Listener implements a RakNet connection listener. It follows the same methods as those implemented by the
@@ -47,6 +52,10 @@ type Listener struct {
 	// pongData is a byte slice of data that is sent in an unconnected pong packet each time the client sends
 	// and unconnected ping to the server.
 	pongData atomic.Value
+
+	// handleUnconnectedPingOverride is a function that is called when we receive an unconnected ping. It may
+	// choose to override the pong data by returning a byte slice, or nil to use whatever is in pongData.
+	handleUnconnectedPingOverride func(net.Addr) []byte
 }
 
 // listenerID holds the next ID to use for a Listener.
@@ -71,6 +80,9 @@ func (l ListenConfig) Listen(address string) (*Listener, error) {
 	}
 	if l.ErrorLog != nil {
 		listener.log = l.ErrorLog
+	}
+	if l.HandleUnconnectedPing != nil {
+		listener.handleUnconnectedPingOverride = l.HandleUnconnectedPing
 	}
 	listener.pongData.Store([]byte{})
 	go listener.listen()
@@ -267,7 +279,15 @@ func (listener *Listener) handleUnconnectedPing(b *bytes.Buffer, addr net.Addr) 
 	}
 	b.Reset()
 
-	(&message.UnconnectedPong{ServerGUID: listener.id, SendTimestamp: pk.SendTimestamp, Data: listener.pongData.Load().([]byte)}).Write(b)
+	pongData := listener.pongData.Load().([]byte)
+
+	if listener.handleUnconnectedPingOverride != nil {
+		if overriddenPong := listener.handleUnconnectedPingOverride(addr); overriddenPong != nil {
+			pongData = overriddenPong
+		}
+	}
+
+	(&message.UnconnectedPong{ServerGUID: listener.id, SendTimestamp: pk.SendTimestamp, Data: pongData}).Write(b)
 	_, err := listener.conn.WriteTo(b.Bytes(), addr)
 	return err
 }

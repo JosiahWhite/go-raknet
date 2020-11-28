@@ -2,9 +2,11 @@ package raknet_test
 
 import (
 	"fmt"
-	"github.com/sandertv/go-raknet"
+	"net"
 	"testing"
 	"time"
+
+	"github.com/sandertv/go-raknet"
 )
 
 func TestListen(t *testing.T) {
@@ -33,4 +35,28 @@ func accept(l *raknet.Listener, c chan error) {
 		c <- fmt.Errorf("error accepting connection: %v", err)
 	}
 	c <- nil
+}
+
+func TestUnconnectedPingOverride(t *testing.T) {
+	const (
+		overriddenPong = "overridden pong"
+	)
+
+	lc := raknet.ListenConfig{
+		HandleUnconnectedPing: func(_ net.Addr) []byte {
+			return []byte(overriddenPong)
+		},
+	}
+	l, err := lc.Listen(":19132")
+	if err != nil {
+		panic(err)
+	}
+	response, err := raknet.Ping("127.0.0.1:19132")
+	if err != nil {
+		t.Fatalf("error connecting to server socket: %v", err)
+	}
+	if string(response) != overriddenPong {
+		t.Fatalf("response doesn't match the overridden pong")
+	}
+	l.Close()
 }
