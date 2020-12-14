@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/sandertv/go-raknet/internal/message"
 	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/sandertv/go-raknet/internal/message"
 )
 
 const (
@@ -602,7 +603,7 @@ func (conn *Conn) handleConnectionRequestAccepted(b *bytes.Buffer) error {
 // continue handling the full packet as it otherwise would.
 // An error is returned if the packet was not valid.
 func (conn *Conn) handleSplitPacket(p *packet) error {
-	const maxSplitCount = 256
+	const maxSplitCount = 1024
 	if p.splitCount > maxSplitCount || len(conn.splits) > 16 {
 		return fmt.Errorf("split count %v (%v active) exceeds the maximum %v", p.splitCount, len(conn.splits), maxSplitCount)
 	}
