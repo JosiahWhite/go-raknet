@@ -230,7 +230,12 @@ func (dialer Dialer) DialContext(ctx context.Context, address string) (*Conn, er
 		id:                 id,
 	}
 	timeout := func(ctx context.Context) error {
-		return &net.OpError{Op: "dial", Net: "raknet", Source: nil, Addr: nil, Err: ctx.Err()}
+		timeoutErr := errUnknownError
+		if ctx.Err() != nil {
+			timeoutErr = ctx.Err()
+		}
+
+		return &net.OpError{Op: "dial", Net: "raknet", Source: nil, Addr: nil, Err: timeoutErr}
 	}
 
 	if err := state.discoverMTUSize(ctx); err != nil {

@@ -13,6 +13,7 @@ var (
 	errListenerClosed = errors.New("use of closed listener")
 
 	errInvalidUnconnectedPong = errors.New("invalid unconnected pong data")
+	errUnknownError           = errors.New("unknown error")
 )
 
 // wrap wraps the error passed into a net.OpError with the op as operation and returns it, or nil if the error
